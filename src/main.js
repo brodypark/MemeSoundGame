@@ -104,6 +104,8 @@ let classification = null; // YAMNet result for `sound`, once it's ready
 let classifyRun = 0; // bumps per sound, so a slow old result can't win
 let subject = ''; // what the images will be of, once the player starts
 let game = null;
+let previewReady = false; // the default meow skips the preview screen
+let imageRun = 0; // bumps per in-game image load, so a stale one can't win
 let busy = false; // ignore clicks while recording/decoding
 
 function showSection(name) {
@@ -124,16 +126,16 @@ async function tryUnlockAudio() {
   }
 }
 
-// Runs one way of getting a sound, then shows the preview (or the error).
-// `knownSubject` skips YAMNet's suggestion when we already know what it is.
-async function pickSound(label, getBuffer, knownSubject = '') {
+// Runs one way of getting a sound, then hands off to `next` (or shows the
+// error).
+async function pickSound(getBuffer, next) {
   if (busy) return;
   busy = true;
   showError('');
   await tryUnlockAudio();
   try {
     sound = await getBuffer();
-    showPreview(label, knownSubject);
+    next();
   } catch (err) {
     showSection('pick');
     showError(err.message);
@@ -142,12 +144,13 @@ async function pickSound(label, getBuffer, knownSubject = '') {
   }
 }
 
-function showPreview(label, knownSubject) {
+function showPreview(label) {
+  previewReady = true;
   showSection('preview');
   drawWaveform($('#waveform'), sound);
   $('#preview-meta').textContent = `${label} · ${sound.duration.toFixed(1)}s`;
-  subjectInput.value = knownSubject;
-  subjectEdited = Boolean(knownSubject);
+  subjectInput.value = '';
+  subjectEdited = false;
   showSubjectError('');
   playBuffer(sound);
   classify();
@@ -198,9 +201,11 @@ function showPicker() {
   newSoundButton.hidden = true;
   scoreEl.textContent = '0';
   titleEl.textContent = 'Brainrot with Brody';
+  titleEl.title = '';
+  imageRun++; // stop a still-loading default meow from touching the title
   showError('');
   // Back to the preview (not the ladder) so the subject can be changed.
-  showSection(sound ? 'preview' : 'pick');
+  showSection(previewReady ? 'preview' : 'pick');
   overlay.hidden = false;
 }
 
@@ -268,6 +273,33 @@ function startGameFromLadder() {
   startGame();
 }
 
+// The default meow skips the preview and the ladder reveal: we already know
+// it's a cat, so start right away with placeholders and swap each tier's
+// image in as it arrives (instant once cached). The game draws from the
+// `visuals` array every frame, so filling it in place shows up live.
+async function startDefault() {
+  previewReady = false;
+  subject = 'cat';
+  visuals = createPlaceholderVisuals();
+  const target = visuals;
+  const run = ++imageRun;
+  const label = `Brainrot with Brody · ${subject}`;
+  titleEl.textContent = `${label} (evolving…)`;
+  startGame();
+
+  let done = 0;
+  const { images, errors } = await getTierImages(subject, ({ tier, image }) => {
+    if (image) target[tier - 1] = createTierVisual(tier, image);
+    if (run === imageRun) titleEl.textContent = `${label} (evolving ${++done}/${TIER_COUNT}…)`;
+  });
+  if (run !== imageRun) return;
+
+  const failed = images.filter((image) => !image).length;
+  titleEl.textContent = failed ? `${label} (${TIER_COUNT - failed}/${TIER_COUNT} glow-ups)` : label;
+  // Errors are usually all the same (e.g. rate limit), so show each once.
+  titleEl.title = failed ? `${[...new Set(errors)].join(' ')} Using stand-ins for the missing ones.` : '';
+}
+
 function startGame() {
   game?.destroy();
   overlay.hidden = true;
@@ -284,7 +316,7 @@ function startGame() {
 // --- Record
 let activeRecording = null;
 $('#record-btn').addEventListener('click', () =>
-  pickSound('Your recording', async () => {
+  pickSound(async () => {
     const status = $('#rec-status');
     const bar = $('#rec-bar');
     const stopButton = $('#stop-btn');
@@ -306,7 +338,7 @@ $('#record-btn').addEventListener('click', () =>
     } finally {
       activeRecording = null;
     }
-  }),
+  }, () => showPreview('Your recording')),
 );
 $('#stop-btn').addEventListener('click', () => activeRecording?.stop());
 
@@ -316,12 +348,12 @@ $('#upload-btn').addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => {
   const file = fileInput.files[0];
   fileInput.value = ''; // so picking the same file again still fires 'change'
-  if (file) pickSound(file.name, () => loadSoundFile(file));
+  if (file) pickSound(() => loadSoundFile(file), () => showPreview(file.name));
 });
 
-// --- Default
+// --- Default: straight to the simulation
 $('#default-btn').addEventListener('click', () =>
-  pickSound('Default meow', () => loadSound('/default-sound.mp3'), 'cat'),
+  pickSound(() => loadSound('/default-sound.mp3'), startDefault),
 );
 
 // --- Preview
