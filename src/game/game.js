@@ -42,12 +42,12 @@ export function createGame({ canvas, sound, visuals, onScore }) {
     onMerge({ tier, x, y }) {
       addScore(getTier(tier).points);
       addEffect(x, y, tier);
-      playBuffer(sound, { rate: playbackRateFor(tier), gain: 0.9 });
+      playBuffer(sound, { rate: playbackRateFor(tier), gain: getTier(tier).volume, priority: tier });
     },
     onPop({ x, y }) {
       addScore(POP_BONUS);
       addEffect(x, y, TIER_COUNT, true);
-      playBuffer(sound, { rate: playbackRateFor(TIER_COUNT) * 0.8, gain: 1 });
+      playBuffer(sound, { rate: playbackRateFor(TIER_COUNT) * 0.8, gain: 1, priority: TIER_COUNT + 1 });
     },
   });
 

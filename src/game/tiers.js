@@ -1,4 +1,4 @@
-// All tier tuning lives here: size, pitch, effect color, placeholder, points.
+// All tier tuning lives here: size, pitch, volume, effect color, placeholder, points.
 //
 // Tier 1 is big and sizes grow only ~1.13x per tier, so the bulb doesn't
 // clog up with high tiers (one of each tier should cover about a third of
@@ -8,16 +8,21 @@
 // the first sound you hear is tier 2 at the original pitch; tier 1 sits one
 // step above it (negative = higher). Tier 6 is 16 semitones (1 1/3 octaves)
 // below the original: the sigma rumble.
+//
+// Volume climbs with tier: low tiers merge constantly and deep sounds read
+// quieter to the ear, so without a boost the rare deep merges get buried.
+// (Tier 1 never plays: merges play the tier they produce.) The master
+// compressor in playback.js keeps the loud end from clipping.
 
 export const TIER_COUNT = 6;
 
 export const TIERS = [
-  { tier: 1, radius: 45, semitonesDown: -4, color: '#ff9ecf', placeholder: '🐣', points: 0 },
-  { tier: 2, radius: 51, semitonesDown: 0, color: '#7fd4ff', placeholder: '🐥', points: 4 },
-  { tier: 3, radius: 58, semitonesDown: 4, color: '#7dffa8', placeholder: '🐤', points: 10 },
-  { tier: 4, radius: 66, semitonesDown: 8, color: '#b98cff', placeholder: '🐔', points: 25 },
-  { tier: 5, radius: 75, semitonesDown: 12, color: '#ffd700', placeholder: '🦅', points: 60 },
-  { tier: 6, radius: 85, semitonesDown: 16, color: '#ffd700', placeholder: '🐉', points: 150 },
+  { tier: 1, radius: 45, semitonesDown: -4, color: '#ff9ecf', volume: 0.5, placeholder: '🐣', points: 0 },
+  { tier: 2, radius: 51, semitonesDown: 0, color: '#7fd4ff', volume: 0.5, placeholder: '🐥', points: 4 },
+  { tier: 3, radius: 58, semitonesDown: 4, color: '#7dffa8', volume: 0.6, placeholder: '🐤', points: 10 },
+  { tier: 4, radius: 66, semitonesDown: 8, color: '#b98cff', volume: 0.75, placeholder: '🐔', points: 25 },
+  { tier: 5, radius: 75, semitonesDown: 12, color: '#ffd700', volume: 0.9, placeholder: '🦅', points: 60 },
+  { tier: 6, radius: 85, semitonesDown: 16, color: '#ffd700', volume: 1, placeholder: '🐉', points: 150 },
 ];
 
 // Bonus for two tier 6s touching: they pop instead of merging.
