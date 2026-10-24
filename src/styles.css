@@ -1,0 +1,36 @@
+:root {
+  --bg: #14121a;
+  --fg: #f4f1ff;
+  --muted: #a49fbd;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.splash {
+  display: grid;
+  place-content: center;
+  min-height: 100vh;
+  padding: 16px;
+  text-align: center;
+}
+
+.splash h1 {
+  margin: 0 0 8px;
+  font-size: clamp(2rem, 8vw, 4rem);
+}
+
+.splash p {
+  margin: 0;
+  color: var(--muted);
+}
