@@ -193,3 +193,69 @@ body {
   font-size: 0.9rem;
   overflow-wrap: anywhere;
 }
+
+.panel .heard {
+  min-height: 1.4em;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.panel .heard.unsure {
+  color: var(--fg);
+  font-weight: 400;
+}
+
+.panel .heard.failed {
+  color: var(--danger);
+  font-weight: 400;
+}
+
+.subject {
+  margin: 0 0 16px;
+  text-align: left;
+}
+
+.subject label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.subject input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--muted);
+  border-radius: 10px;
+  background: #1a1626;
+  color: var(--fg);
+  /* 16px stops iOS Safari from zooming in when the field is focused. */
+  font: inherit;
+  font-size: 16px;
+}
+
+.subject input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.subject input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.panel .field-error {
+  margin: 6px 0 0;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.panel .field-error[hidden] {
+  display: none;
+}
+
+.hud .title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}

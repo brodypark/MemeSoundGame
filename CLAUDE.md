@@ -55,8 +55,8 @@ sound-merge/
 
 1. Player uploads a sound or records one (cap at ~2s, show a waveform or timer).
 2. Decode to an `AudioBuffer`, resample to **16 kHz mono** (YAMNet's required input).
-3. Run YAMNet, take the top class label + confidence.
-4. Check the cache for that label. If all 6 tier images are cached, skip to step 7.
+3. Run YAMNet, take the top class label + confidence, and use it to pre-fill a "What made this sound?" text box. The player can edit it, and must fill it in when YAMNet only hears a voice. The validated text is the **subject**.
+4. Check the cache for that subject. If all 6 tier images are cached, skip to step 7.
 5. Request the 6 tier images from `/api/generate-image` (see Image generation). Show a progress UI ("Evolving your cat… 3/6") and ideally reveal each image as it arrives.
 6. If any tier fails, use a fallback (emoji or colored blob) for just that tier so the game can still start.
 7. Start the simulation: tier 1 items spawn at the top on a timer.
@@ -64,20 +64,25 @@ sound-merge/
 
 ## YAMNet notes
 
-- Load with TensorFlow.js: `tf.loadGraphModel('https://tfhub.dev/google/tfjs-model/yamnet/tfjs/1', { fromTFHub: true })`. Verify this URL still works before building around it; if not, download the model and self-host it in `public/`.
+- The model is self-hosted in `public/models/yamnet/` (model.json + 4 weight shards, ~16 MB) and loaded with `tf.loadGraphModel('/models/yamnet/model.json')`. The old tfhub.dev URL 404s now; the source is Kaggle (`google/yamnet/tfJs/tfjs/1`). TensorFlow.js is lazy-loaded with a dynamic `import()` so it doesn't slow the first page load.
+- `model.predict(waveform)` returns `[scores [frames,521], embeddings, spectrogram]`.
+- `yamnet_class_map.csv` uses CRLF line endings; split on `/\r?\n/`.
 - Input: 16 kHz mono float32 waveform. Output: scores for 521 classes. Average scores across frames, take argmax.
 - Class names come from `yamnet_class_map.csv` (TensorFlow models repo, `research/audioset/yamnet`). Download it into `public/` and parse it on load.
 - Sounds under ~1s: pad with silence to ~1s so the model has a full frame.
 - Generic results like "Speech", "Music", or "Silence" are likely for odd noises. Handle them gracefully: use a fun fallback subject or ask the player to try again. Show the detected label in the UI so the result feels explained.
+- A person imitating an animal ("meow!") classifies as Speech ~97–99% with no animal signal at all; YAMNet files every human voice as speech. That's why the player types the subject. Generic labels (incl. all speech labels) never pre-fill the box.
+- Short clips are looped to 1s, not silence-padded: padding scored "Silence" ~50% and drowned out the real label.
+- `src/audio/subject.js` maps animal-sound labels to the animal ("Meow" → "cat") and holds the subject validation rules the server must mirror.
 - Run classification once per sound, not per merge.
 
 ## Image generation (6-stage glow-up ladder)
 
 - Provider: start with the OpenAI Images API (user has experience with the OpenAI API). Keep provider, model name, size, and quality in env vars so they can be swapped without code changes. Check current docs for the best model/params rather than assuming.
 - **6 images per sound, one per tier.** Tier 1 = humblest/youngest, tier 6 = peak legendary mogger.
-- **Prompt ladder lives on the server.** The client sends only `{ label, tier }` (tier is an integer 1–6). The server validates both and builds the prompt itself from fixed templates. The client never sends free-form prompts.
-- Two ladders, chosen server-side from the label:
-  - **Living things** (cat, dog, bird, cow, horse, frog, human-ish animals, etc.; use a small allowlist/map of YAMNet animal labels): baby → glow-up.
+- **Prompt ladder lives on the server.** The client sends only `{ subject, tier }` (tier is an integer 1–6). `subject` is the player's short description (2–50 chars, letters/numbers/spaces/`-`/`'` only, lowercased). The server re-validates both and drops the subject into fixed templates; the player only ever fills the `{subject}` slot, never writes a prompt. The provider's own moderation still applies.
+- Two ladders, chosen server-side from the subject:
+  - **Living things** (subject contains a word from a small server-side animal/person word list: cat, dog, bird, cow, horse, frog, guy, etc.): baby → glow-up.
   - **Everything else** (water, applause, car, bell, etc.): humble/plain → epic/legendary glow-up of the same object.
 
   Living-things ladder (replace `{subject}`):
@@ -94,7 +99,7 @@ sound-merge/
 - **Consistency:** the 6 images should look like the same character. Best option: generate tier 1 first, then use the provider's image edit/reference-image endpoint to produce tiers 2–6 from it (if supported and affordable). Fallback: prompt-only with the same `{subject}` wording and style suffix. Start with prompt-only, upgrade to reference-image if the results look inconsistent.
 - Small size (e.g. 512×512 or smaller), lowest quality setting that looks fine. Images are clipped to circles in-game anyway.
 - **Cost:** this is 6 API calls per new sound, so cost control matters:
-  - **Cache by label** (all 6 images per label), in localStorage and/or server-side storage. "Cat" is generated once ever, then reused.
+  - **Cache by subject** (all 6 images per normalized subject), in localStorage and/or server-side storage. "cat" is generated once ever, then reused. Free text means fewer cache hits than fixed labels, so the rate limits matter more.
   - Rate limit counts a *set* of 6 as one generation. Cap sets per IP per hour/day.
   - Optional: a global daily cap on total images generated; return a friendly "come back tomorrow" when hit.
 - Fire the 6 requests in parallel (or tier 1 first, then 2–6 in parallel if using reference images). Show per-tier progress. Retry a failed tier once, then use the fallback visual for that tier.
@@ -121,8 +126,8 @@ sound-merge/
 - Before every commit: run `git status` and `git diff --staged` and confirm no secrets or `.env*` files (other than `.env.example`) are staged. Do **not** use `git add .` blindly; stage files deliberately.
 - If a key is ever committed or pasted somewhere public: **revoke and rotate it immediately** at the provider dashboard. Removing it in a later commit does not remove it from git history.
 - Set a **hard monthly spend limit** in the image provider's dashboard. With 6 images per new sound, this matters more.
-- The serverless function should: validate input (`label` must be a short string with allowlisted characters and max length; `tier` must be an integer 1–6), reject everything else, build the prompt server-side, fix model/size/quality server-side (never trust client-supplied params), and apply rate limiting per IP plus a global daily cap.
-- The deployed API route must not be a free open proxy: it only accepts `{ label, tier }` and always uses server-side-fixed settings.
+- The serverless function should: validate input (`subject` must be a 2–50 char string matching the same allowlist as `src/audio/subject.js`; `tier` must be an integer 1–6), reject everything else, build the prompt server-side, fix model/size/quality server-side (never trust client-supplied params), and apply rate limiting per IP plus a global daily cap.
+- The deployed API route must not be a free open proxy: it only accepts `{ subject, tier }` and always uses server-side-fixed settings.
 
 ### `.gitignore` (create first, before the first commit)
 
@@ -179,13 +184,14 @@ MAX_IMAGES_PER_DAY=300
 **Phase 3: YAMNet classification**
 - Load model + class map, resample to 16 kHz mono, classify, show label + confidence.
 - Handle low-confidence/generic labels.
+- "What made this sound?" text box, pre-filled from YAMNet, validated before starting.
 
 **Phase 4: Image generation (6-stage ladder)**
-- `api/generate-image.js`: validate `{ label, tier }`, build the server-side prompt from the baby→mogger ladder, fixed server-side params, rate limiting + daily cap.
-- Frontend: request all 6 tiers, per-tier progress UI, retry once, per-tier fallback visual, cache all 6 by label.
+- `api/generate-image.js`: validate `{ subject, tier }`, build the server-side prompt from the baby→mogger ladder, fixed server-side params, rate limiting + daily cap.
+- Frontend: request all 6 tiers, per-tier progress UI, retry once, per-tier fallback visual, cache all 6 by subject.
 - Wire the 6 images into the 6 tiers in the game.
 - Local dev via `vercel dev` so the serverless function runs locally with `.env.local`.
-- Test with a few labels (cat, dog, water) and check the glow-up reads clearly and the character stays consistent. If not, switch to the reference-image approach.
+- Test with a few subjects (cat, dog, water) and check the glow-up reads clearly and the character stays consistent. If not, switch to the reference-image approach.
 
 **Phase 5: Polish**
 - Reveal animation showing the 6-image evolution before the game starts, merge effects (pop, particles), tier-6 flourish, score, game over + restart, evolution chart sidebar, mobile layout, "try another sound" button.

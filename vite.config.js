@@ -6,4 +6,8 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  build: {
+    // TensorFlow.js is ~1 MB on its own; it's lazy-loaded, so that's expected.
+    chunkSizeWarningLimit: 1200,
+  },
 });
