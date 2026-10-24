@@ -2,7 +2,7 @@
 
 ## What this is
 
-A browser game. The player uploads or records a short sound (≤ ~2s). The app classifies it with YAMNet, then generates **6 images** of what the sound is (meow → cat) with an image generation API. The 6 images are a "glow-up" ladder: tier 1 is a baby/humble version, tier 6 is the ultimate legendary "mogger" version (meme-style: the cat gets more handsome and powerful every tier). The images then drive a Suika-style merge game: items drop into a bucket, bounce around, and merge when two of the same tier touch. Each merge moves up a tier, swaps to the next image, and plays the sound at a lower pitch. **6 tiers total, one image per tier.**
+A browser game. The player uploads or records a short sound (≤ ~2s). The app classifies it with YAMNet, then generates **6 images** of what the sound is (meow → cat) with an image generation API. The 6 images are a "glow-up" ladder: tier 1 is a baby/humble version, tier 6 is the ultimate legendary "mogger" version (meme-style: the cat gets more handsome and powerful every tier). The images then drive a hands-off merge simulation: tier 1 items constantly rain down through a funnel into a big box, bounce around (low gravity, springy), and merge when two of the same tier touch. Each merge moves up a tier, swaps to the next image, and plays the sound at a lower pitch. **6 tiers total, one image per tier.**
 
 The joke: lower pitch = more sigma. A tiny baby cat's high-pitched meow becomes a deep rumble coming from a god-tier handsome cat.
 
@@ -43,7 +43,8 @@ sound-merge/
     ├── image/
     │   └── generate.js   # requests all 6 tier images, progress, caching
     ├── game/
-    │   ├── world.js      # Matter.js setup, bucket walls
+    │   ├── game.js       # sim loop: spawning, physics steps, scoring, effects
+    │   ├── world.js      # Matter.js setup, funnel + box walls
     │   ├── merge.js      # collision handling + tier logic
     │   ├── tiers.js      # 6 tiers: sizes, pitch rates, border colors
     │   └── render.js     # canvas drawing, images clipped to circles
@@ -58,8 +59,8 @@ sound-merge/
 4. Check the cache for that label. If all 6 tier images are cached, skip to step 7.
 5. Request the 6 tier images from `/api/generate-image` (see Image generation). Show a progress UI ("Evolving your cat… 3/6") and ideally reveal each image as it arrives.
 6. If any tier fails, use a fallback (emoji or colored blob) for just that tier so the game can still start.
-7. Start the game with tier 1 as the drop item.
-8. Drop items → bounce → same-tier collision merges into the next tier, shows the next image, plays the sound at a lower pitch.
+7. Start the simulation: tier 1 items spawn at the top on a timer.
+8. Items fall through the funnel → bounce in the box → same-tier collision merges into the next tier, shows the next image, plays the sound at a lower pitch.
 
 ## YAMNet notes
 
@@ -104,9 +105,10 @@ sound-merge/
 - Tier sizes grow roughly 1.35–1.5× per tier. Define everything in `tiers.js` so it's easy to tune.
 - Pitch per tier: `playbackRate = 2 ** (-semitones / 12)`, dropping ~4 semitones per tier (tier 1 = original, tier 6 ≈ 20 semitones lower). Tune by ear so tier 6 is a deep rumble.
 - Each tier has a colored border (e.g. baby pink → gold → glowing rainbow for tier 6) so progress reads at a glance.
-- Only play merge sounds on a merge (and a quiet drop sound). Throttle if many merges happen at once.
-- Game over when items stay above a line at the top of the bucket for ~2s.
-- Mobile-friendly: touch to aim and release, canvas scales to viewport.
+- It's a simulation, not a game: no aiming, no game over. Tier 1s auto-spawn at random x along the top (~1.2s interval, paused above an item cap), slide through a funnel, and merge only once below the funnel neck (so big merged items can't jam it). A Reset button clears the box.
+- Physics feel: low gravity (0.1) and springy items/walls (high restitution, very low air drag). Tune in `world.js` / `game.js`.
+- Only play sounds on a merge (not on spawn). Throttle if many merges happen at once.
+- Mobile-friendly: canvas scales to viewport.
 - Browsers block audio until a user gesture. Create/resume the `AudioContext` on the first click/tap.
 - Optional fun: a small "evolution chart" along the side showing all 6 images in order, so players see the glow-up they're working toward.
 
@@ -166,7 +168,7 @@ MAX_IMAGES_PER_DAY=300
 - `git init`, `.gitignore`, `.env.example`, Vite project, README, first commit, GitHub repo pushed.
 
 **Phase 1: The game with fake input**
-- Matter.js bucket, drop items, merge logic, **6 tiers**, canvas rendering.
+- Matter.js funnel + box, auto-spawning items, merge logic, **6 tiers**, canvas rendering.
 - Use 6 placeholder visuals (e.g. a row of emoji or colored circles of increasing size) and `public/default-sound.wav`.
 - Pitch-shifted merge sounds working across all 6 tiers.
 

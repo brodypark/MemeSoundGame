@@ -2,6 +2,8 @@
   --bg: #14121a;
   --fg: #f4f1ff;
   --muted: #a49fbd;
+  --accent: #ffd700;
+  --danger: #ff6b6b;
   font-family: system-ui, -apple-system, sans-serif;
 }
 
@@ -15,22 +17,111 @@ body {
   height: 100%;
   background: var(--bg);
   color: var(--fg);
+  overscroll-behavior: none;
 }
 
-.splash {
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+}
+
+.hud .title {
+  font-weight: 700;
+}
+
+.hud-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hud button {
+  padding: 6px 14px;
+  border: 1px solid var(--muted);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.hud button[hidden] {
+  display: none;
+}
+
+.hud strong {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
   display: grid;
-  place-content: center;
-  min-height: 100vh;
+  place-items: center;
+  padding: 0 16px 16px;
+}
+
+#game {
+  display: block;
+  border-radius: 12px;
+  /* Stop touch drags from scrolling/zooming the page while aiming. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   padding: 16px;
+  background: rgba(10, 8, 16, 0.6);
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.panel {
+  max-width: 320px;
+  padding: 24px;
+  border-radius: 16px;
+  background: #241f33;
   text-align: center;
 }
 
-.splash h1 {
+.panel h1 {
   margin: 0 0 8px;
-  font-size: clamp(2rem, 8vw, 4rem);
+  font-size: 2rem;
 }
 
-.splash p {
-  margin: 0;
+.panel p {
+  margin: 0 0 16px;
   color: var(--muted);
+}
+
+.panel .error {
+  color: var(--danger);
+}
+
+.panel button {
+  padding: 12px 24px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #1a1400;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
 }
