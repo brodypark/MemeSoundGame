@@ -78,7 +78,7 @@ sound-merge/
 
 ## Image generation (6-stage glow-up ladder)
 
-- Provider: start with the OpenAI Images API (user has experience with the OpenAI API). Keep provider, model name, size, and quality in env vars so they can be swapped without code changes. Check current docs for the best model/params rather than assuming.
+- Provider: **Google Gemini** (`gemini-3.1-flash-lite-image`, cheapest/fastest, ~$0.034/image, no free tier for images) via the stable `models/{model}:generateContent` REST endpoint with `responseModalities: ['IMAGE']`. Key goes in the `x-goog-api-key` header, never the URL. Safety blocks come back as HTTP 200 with `promptFeedback.blockReason` or an `IMAGE_SAFETY`-style `finishReason`. Keep provider, model name and size in env vars so they can be swapped without code changes. Check current docs for the best model/params rather than assuming.
 - **6 images per sound, one per tier.** Tier 1 = humblest/youngest, tier 6 = peak legendary mogger.
 - **Prompt ladder lives on the server.** The client sends only `{ subject, tier }` (tier is an integer 1–6). `subject` is the player's short description (2–50 chars, letters/numbers/spaces/`-`/`'` only, lowercased). The server re-validates both and drops the subject into fixed templates; the player only ever fills the `{subject}` slot, never writes a prompt. The provider's own moderation still applies.
 - Two ladders, chosen server-side from the subject:
@@ -95,9 +95,9 @@ sound-merge/
 
   Object ladder: same idea, e.g. 1 = small plain version, 3 = shiny and stylish, 6 = epic legendary glowing god-tier version.
 
-  All prompts share a suffix: `centered subject, full body or full object visible, simple background, no text, no watermark` (and `transparent background` if the model supports it).
+  All prompts share a suffix: `centered subject, full body or full object visible, simple background, no text, no watermark` (Gemini has no transparent-background option, so the suffix asks for a plain solid white background and images fill the whole circle).
 - **Consistency:** the 6 images should look like the same character. Best option: generate tier 1 first, then use the provider's image edit/reference-image endpoint to produce tiers 2–6 from it (if supported and affordable). Fallback: prompt-only with the same `{subject}` wording and style suffix. Start with prompt-only, upgrade to reference-image if the results look inconsistent.
-- Small size (e.g. 512×512 or smaller), lowest quality setting that looks fine. Images are clipped to circles in-game anyway.
+- Smallest size the provider allows (Gemini `imageSize: '1K'` = 1024×1024; the lite model only supports 1K), square `aspectRatio: '1:1'`. Images are clipped to circles in-game anyway.
 - **Cost:** this is 6 API calls per new sound, so cost control matters:
   - **Cache by subject** (all 6 images per normalized subject), in localStorage and/or server-side storage. "cat" is generated once ever, then reused. Free text means fewer cache hits than fixed labels, so the rate limits matter more.
   - Rate limit counts a *set* of 6 as one generation. Cap sets per IP per hour/day.
@@ -147,9 +147,9 @@ dist/
 ```
 # Copy to .env.local and fill in real values. NEVER commit .env.local.
 IMAGE_API_KEY=your-key-here
-IMAGE_MODEL=
-IMAGE_SIZE=512x512
-IMAGE_QUALITY=low
+IMAGE_PROVIDER=gemini
+IMAGE_MODEL=gemini-3.1-flash-lite-image
+IMAGE_SIZE=1K
 MAX_SETS_PER_IP_PER_HOUR=3
 MAX_IMAGES_PER_DAY=300
 ```
@@ -190,7 +190,7 @@ MAX_IMAGES_PER_DAY=300
 - `api/generate-image.js`: validate `{ subject, tier }`, build the server-side prompt from the baby→mogger ladder, fixed server-side params, rate limiting + daily cap.
 - Frontend: request all 6 tiers, per-tier progress UI, retry once, per-tier fallback visual, cache all 6 by subject.
 - Wire the 6 images into the 6 tiers in the game.
-- Local dev via `vercel dev` so the serverless function runs locally with `.env.local`.
+- Local dev: `npm run dev` runs `api/generate-image.js` as Vite dev middleware (see `vite.config.js`), reading `.env.local` server-side only. `vercel dev` also works once the project is linked.
 - Test with a few subjects (cat, dog, water) and check the glow-up reads clearly and the character stays consistent. If not, switch to the reference-image approach.
 
 **Phase 5: Polish**

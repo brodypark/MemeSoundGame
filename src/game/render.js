@@ -1,26 +1,51 @@
 import { TIERS, getTier } from './tiers.js';
 import { WORLD } from './world.js';
 
-// Placeholder visual per tier: emoji on a soft gradient, drawn once to an
-// offscreen canvas. Phase 4 swaps these for generated images; the renderer
-// only cares that each visual is something drawImage() accepts.
+const VISUAL_SIZE = 256;
+
+// Each tier visual is drawn once to an offscreen canvas: a soft gradient in
+// the tier color, with either the generated image or an emoji on top. The
+// renderer only cares that each visual is something drawImage() accepts.
+function tierCanvas(color) {
+  const c = document.createElement('canvas');
+  c.width = c.height = VISUAL_SIZE;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(
+    VISUAL_SIZE * 0.4, VISUAL_SIZE * 0.35, VISUAL_SIZE * 0.05,
+    VISUAL_SIZE / 2, VISUAL_SIZE / 2, VISUAL_SIZE / 2,
+  );
+  grad.addColorStop(0, '#ffffff');
+  grad.addColorStop(1, color);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, VISUAL_SIZE, VISUAL_SIZE);
+  return { c, g };
+}
+
+function placeholderVisual({ color, placeholder }) {
+  const { c, g } = tierCanvas(color);
+  g.font = `${VISUAL_SIZE * 0.62}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(placeholder, VISUAL_SIZE / 2, VISUAL_SIZE * 0.54);
+  return c;
+}
+
+// Generated images are square with a plain white background, so they fill
+// the whole visual; the circle clip and the tier-colored border frame them.
+function imageVisual(image, { color }) {
+  const { c, g } = tierCanvas(color);
+  g.drawImage(image, 0, 0, VISUAL_SIZE, VISUAL_SIZE);
+  return c;
+}
+
 export function createPlaceholderVisuals() {
-  return TIERS.map(({ color, placeholder }) => {
-    const size = 256;
-    const c = document.createElement('canvas');
-    c.width = c.height = size;
-    const g = c.getContext('2d');
-    const grad = g.createRadialGradient(size * 0.4, size * 0.35, size * 0.05, size / 2, size / 2, size / 2);
-    grad.addColorStop(0, '#ffffff');
-    grad.addColorStop(1, color);
-    g.fillStyle = grad;
-    g.fillRect(0, 0, size, size);
-    g.font = `${size * 0.62}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(placeholder, size / 2, size * 0.54);
-    return c;
-  });
+  return TIERS.map(placeholderVisual);
+}
+
+// The visual for one tier: the generated image, or the placeholder when
+// `image` is null (not generated yet, or generation failed).
+export function createTierVisual(tier, image) {
+  return image ? imageVisual(image, getTier(tier)) : placeholderVisual(getTier(tier));
 }
 
 export function createRenderer(canvas) {

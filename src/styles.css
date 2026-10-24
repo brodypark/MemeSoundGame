@@ -259,3 +259,40 @@ body {
   white-space: nowrap;
   min-width: 0;
 }
+
+.ladder {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.ladder .slot {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+/* Waiting for its image: dimmed and gently pulsing. */
+.ladder .slot.pending {
+  opacity: 0.35;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.ladder .slot.failed {
+  opacity: 0.6;
+  filter: grayscale(0.6);
+}
+
+@keyframes pulse {
+  50% {
+    transform: scale(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ladder .slot.pending {
+    animation: none;
+  }
+}

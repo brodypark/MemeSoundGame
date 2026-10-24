@@ -3,9 +3,12 @@
 // "New sound" in the header goes back to the picker.
 // The preview also runs YAMNet once per sound, shows what it heard, and
 // pre-fills the "what made this sound?" box, which the player can edit.
-// That subject is what Phase 4 will generate images of.
+// Then the 6 tier images for that subject are generated (or loaded from
+// cache) and shown as an evolution ladder before the simulation starts.
 import { createGame } from './game/game.js';
-import { createPlaceholderVisuals } from './game/render.js';
+import { createPlaceholderVisuals, createTierVisual } from './game/render.js';
+import { getTierImages } from './image/generate.js';
+import { TIER_COUNT } from './game/tiers.js';
 import { loadSound, unlockAudio, playBuffer } from './audio/playback.js';
 import { startRecording } from './audio/record.js';
 import { loadSoundFile } from './audio/upload.js';
@@ -63,6 +66,13 @@ app.innerHTML = `
           <button id="redo-btn" class="link" type="button">pick a different sound</button>
         </section>
 
+        <section id="generating" hidden>
+          <p class="status" id="gen-status" aria-live="polite"></p>
+          <div class="ladder" id="ladder"></div>
+          <p class="meta" id="gen-note"></p>
+          <button id="go-btn" class="primary" type="button" hidden>Let's go</button>
+        </section>
+
         <p class="error" id="error" role="alert" hidden></p>
       </div>
     </div>
@@ -80,9 +90,14 @@ const titleEl = $('#title');
 const subjectInput = $('#subject');
 const subjectError = $('#subject-error');
 let subjectEdited = false; // once the player types, YAMNet stops overwriting
-const sections = { pick: $('#pick'), recording: $('#recording'), preview: $('#preview') };
+const sections = {
+  pick: $('#pick'),
+  recording: $('#recording'),
+  preview: $('#preview'),
+  generating: $('#generating'),
+};
 
-const visuals = createPlaceholderVisuals();
+let visuals = createPlaceholderVisuals(); // one drawable per tier
 let sound = null; // the AudioBuffer the player picked
 let classification = null; // YAMNet result for `sound`, once it's ready
 let classifyRun = 0; // bumps per sound, so a slow old result can't win
@@ -183,6 +198,7 @@ function showPicker() {
   scoreEl.textContent = '0';
   titleEl.textContent = 'Sound Merge';
   showError('');
+  // Back to the preview (not the ladder) so the subject can be changed.
   showSection(sound ? 'preview' : 'pick');
   overlay.hidden = false;
 }
@@ -198,6 +214,55 @@ function startFromPreview() {
   }
   subject = value;
   subjectInput.value = value;
+  generateImages();
+}
+
+// Fetch (or load from cache) the 6 tier images and reveal them one by one.
+// Failed tiers keep their placeholder so the simulation can always start.
+async function generateImages() {
+  showSection('generating');
+  const status = $('#gen-status');
+  const note = $('#gen-note');
+  const goButton = $('#go-btn');
+  const ladder = $('#ladder');
+  goButton.hidden = true;
+  note.textContent = '';
+
+  // One slot per tier, showing the placeholder until its image arrives.
+  const slots = [];
+  ladder.replaceChildren();
+  for (let tier = 1; tier <= TIER_COUNT; tier++) {
+    const slot = document.createElement('canvas');
+    slot.className = 'slot pending';
+    slot.width = slot.height = 128;
+    slot.getContext('2d').drawImage(createTierVisual(tier, null), 0, 0, 128, 128);
+    ladder.append(slot);
+    slots.push(slot);
+  }
+
+  let done = 0;
+  status.textContent = `Evolving your ${subject}… 0/${TIER_COUNT}`;
+  const { images, errors } = await getTierImages(subject, ({ tier, image }) => {
+    const slot = slots[tier - 1];
+    slot.className = image ? 'slot' : 'slot failed';
+    slot.getContext('2d').drawImage(createTierVisual(tier, image), 0, 0, 128, 128);
+    status.textContent = `Evolving your ${subject}… ${++done}/${TIER_COUNT}`;
+  });
+
+  visuals = images.map((image, i) => createTierVisual(i + 1, image));
+  const failed = images.filter((image) => !image).length;
+  if (failed === 0) {
+    status.textContent = `Behold: the ${subject} glow-up.`;
+  } else {
+    status.textContent = failed === TIER_COUNT ? 'No glow-up this time.' : `${TIER_COUNT - failed}/${TIER_COUNT} glow-ups made.`;
+    // Errors are usually all the same (e.g. rate limit), so show each once.
+    note.textContent = `${[...new Set(errors)].join(' ')} Using stand-ins for the missing ones.`;
+  }
+  goButton.hidden = false;
+  goButton.focus();
+}
+
+function startGameFromLadder() {
   titleEl.textContent = `Sound Merge · ${subject}`;
   startGame();
 }
@@ -280,6 +345,11 @@ subjectInput.addEventListener('input', () => {
 $('#redo-btn').addEventListener('click', () => {
   showError('');
   showSection('pick');
+});
+
+$('#go-btn').addEventListener('click', async () => {
+  await tryUnlockAudio();
+  startGameFromLadder();
 });
 
 // --- Header
