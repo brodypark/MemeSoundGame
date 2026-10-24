@@ -149,6 +149,34 @@ body {
   color: #1a1400;
 }
 
+/* Same rainbow as the flask outline. */
+.panel h1.brand {
+  font-size: 2.1rem;
+  line-height: 1.1;
+  background: linear-gradient(90deg, #ff4d4d, #ffb347, #fff04d, #5dff7a, #4dc3ff, #5b5bff, #d14dff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* The main call to action: start right away with the default sound. */
+.panel button.big {
+  width: 100%;
+  padding: 16px 20px;
+  font-size: 1.15rem;
+}
+
+.panel .or {
+  margin: 18px 0 8px;
+  font-size: 0.9rem;
+}
+
+.actions.small button {
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
 .panel button.link {
   padding: 4px;
   border: 0;

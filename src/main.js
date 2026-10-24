@@ -20,7 +20,7 @@ const app = document.querySelector('#app');
 
 app.innerHTML = `
   <header class="hud">
-    <span class="title" id="title">Sound Merge</span>
+    <span class="title" id="title">Brainrot with Brody</span>
     <span class="hud-right">
       <span class="score">Score: <strong id="score">0</strong></span>
       <button id="new-sound" type="button" hidden>New sound</button>
@@ -31,16 +31,17 @@ app.innerHTML = `
     <canvas id="game"></canvas>
     <div class="overlay" id="overlay">
       <div class="panel">
-        <h1>Sound Merge</h1>
+        <h1 class="brand">Brainrot with Brody</h1>
 
         <section id="pick">
-          <p>Give it a short sound (2s max). It rains into the funnel, merges, glows up, and gets deeper.</p>
-          <div class="actions">
-            <button id="record-btn" class="primary" type="button">🎙️ Record</button>
+          <p>A sound rains into the flask, merges, glows up, and gets deeper.</p>
+          <button id="default-btn" class="primary big" type="button">🐱 Use the default meow</button>
+          <p class="or">or use your own sound (2s max)</p>
+          <div class="actions small">
+            <button id="record-btn" type="button">🎙️ Record</button>
             <button id="upload-btn" type="button">📁 Upload</button>
           </div>
           <input id="file-input" type="file" accept="audio/*,video/*" hidden />
-          <button id="default-btn" class="link" type="button">or use the default meow</button>
         </section>
 
         <section id="recording" hidden>
@@ -196,7 +197,7 @@ function showPicker() {
   resetButton.hidden = true;
   newSoundButton.hidden = true;
   scoreEl.textContent = '0';
-  titleEl.textContent = 'Sound Merge';
+  titleEl.textContent = 'Brainrot with Brody';
   showError('');
   // Back to the preview (not the ladder) so the subject can be changed.
   showSection(sound ? 'preview' : 'pick');
@@ -263,7 +264,7 @@ async function generateImages() {
 }
 
 function startGameFromLadder() {
-  titleEl.textContent = `Sound Merge · ${subject}`;
+  titleEl.textContent = `Brainrot with Brody · ${subject}`;
   startGame();
 }
 
