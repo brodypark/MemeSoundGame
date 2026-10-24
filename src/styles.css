@@ -1,5 +1,5 @@
 :root {
-  --bg: #14121a;
+  --bg: #000;
   --fg: #f4f1ff;
   --muted: #a49fbd;
   --accent: #ffd700;
@@ -270,7 +270,6 @@ body {
 .ladder .slot {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 50%;
   transition: opacity 0.3s, transform 0.3s;
 }
 

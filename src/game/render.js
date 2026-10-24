@@ -1,41 +1,84 @@
 import { TIERS, getTier } from './tiers.js';
-import { WORLD } from './world.js';
+import { WORLD, neckAngles } from './world.js';
 
-const VISUAL_SIZE = 256;
+const VISUAL_SIZE = 256; // the image/emoji itself
+const GLOW_PAD = 36; // room around it for the baked-in glow
+const PADDED_SIZE = VISUAL_SIZE + GLOW_PAD * 2;
+// Items are drawn so the image (not the glow) spans the physics circle.
+const DRAW_SCALE = PADDED_SIZE / VISUAL_SIZE;
 
-// Each tier visual is drawn once to an offscreen canvas: a soft gradient in
-// the tier color, with either the generated image or an emoji on top. The
-// renderer only cares that each visual is something drawImage() accepts.
-function tierCanvas(color) {
+const RAINBOW = ['#ff4d4d', '#ffb347', '#fff04d', '#5dff7a', '#4dc3ff', '#5b5bff', '#d14dff', '#ff4d4d'];
+
+// Gemini images come back on a plain white background (there's no
+// transparency option). Flood-fill from the edges and fade near-white
+// pixels to transparent so the subject reads as a cutout. Only white that
+// connects to the border is removed, so white fur or eyes inside the
+// subject survive.
+const CLEAR_BELOW = 18; // "whiteness distance" at or below this: fully transparent
+const FEATHER_TO = 60; // up to this: partially transparent (soft edge)
+
+function removeWhiteBackground(g, size) {
+  let data;
+  try {
+    data = g.getImageData(0, 0, size, size);
+  } catch {
+    return; // tainted canvas or similar: keep the white background
+  }
+  const px = data.data;
+  // 0 = pure white; grows as any channel gets darker.
+  const distance = (p) => 255 - Math.min(px[p * 4], px[p * 4 + 1], px[p * 4 + 2]);
+  const seen = new Uint8Array(size * size);
+  const stack = [];
+  for (let i = 0; i < size; i++) {
+    stack.push(i, (size - 1) * size + i, i * size, i * size + size - 1);
+  }
+  while (stack.length) {
+    const p = stack.pop();
+    if (seen[p]) continue;
+    seen[p] = 1;
+    const d = distance(p);
+    if (d > FEATHER_TO) continue; // hit the subject: stop spreading here
+    px[p * 4 + 3] = d <= CLEAR_BELOW ? 0 : Math.round((255 * (d - CLEAR_BELOW)) / (FEATHER_TO - CLEAR_BELOW));
+    const x = p % size;
+    if (x > 0) stack.push(p - 1);
+    if (x < size - 1) stack.push(p + 1);
+    if (p >= size) stack.push(p - size);
+    if (p < size * (size - 1)) stack.push(p + size);
+  }
+  g.putImageData(data, 0, 0);
+}
+
+// Each tier visual is drawn once to an offscreen canvas: the cutout image
+// (or emoji) with a soft warm glow around its silhouette. Baking the glow
+// in here is much cheaper than shadowBlur on every item every frame.
+function glowVisual(source, tier) {
+  const c = document.createElement('canvas');
+  c.width = c.height = PADDED_SIZE;
+  const g = c.getContext('2d');
+  g.shadowColor = tier === 6 ? '#ffd700' : '#ffcf99';
+  g.shadowBlur = tier === 6 ? 34 : 22;
+  g.drawImage(source, GLOW_PAD, GLOW_PAD, VISUAL_SIZE, VISUAL_SIZE);
+  return c;
+}
+
+function placeholderVisual({ tier, placeholder }) {
   const c = document.createElement('canvas');
   c.width = c.height = VISUAL_SIZE;
   const g = c.getContext('2d');
-  const grad = g.createRadialGradient(
-    VISUAL_SIZE * 0.4, VISUAL_SIZE * 0.35, VISUAL_SIZE * 0.05,
-    VISUAL_SIZE / 2, VISUAL_SIZE / 2, VISUAL_SIZE / 2,
-  );
-  grad.addColorStop(0, '#ffffff');
-  grad.addColorStop(1, color);
-  g.fillStyle = grad;
-  g.fillRect(0, 0, VISUAL_SIZE, VISUAL_SIZE);
-  return { c, g };
-}
-
-function placeholderVisual({ color, placeholder }) {
-  const { c, g } = tierCanvas(color);
-  g.font = `${VISUAL_SIZE * 0.62}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
+  g.font = `${VISUAL_SIZE * 0.8}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillText(placeholder, VISUAL_SIZE / 2, VISUAL_SIZE * 0.54);
-  return c;
+  return glowVisual(c, tier);
 }
 
-// Generated images are square with a plain white background, so they fill
-// the whole visual; the circle clip and the tier-colored border frame them.
-function imageVisual(image, { color }) {
-  const { c, g } = tierCanvas(color);
+function imageVisual(image, { tier }) {
+  const c = document.createElement('canvas');
+  c.width = c.height = VISUAL_SIZE;
+  const g = c.getContext('2d', { willReadFrequently: true });
   g.drawImage(image, 0, 0, VISUAL_SIZE, VISUAL_SIZE);
-  return c;
+  removeWhiteBackground(g, VISUAL_SIZE);
+  return glowVisual(c, tier);
 }
 
 export function createPlaceholderVisuals() {
@@ -69,39 +112,11 @@ export function createRenderer(canvas) {
     ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
   }
 
-  function borderStyle(tier, angle, time) {
-    const t = getTier(tier);
-    if (t.rainbow && ctx.createConicGradient) {
-      const grad = ctx.createConicGradient(angle + time / 600, 0, 0);
-      ['#ff4d4d', '#ffb347', '#fff04d', '#5dff7a', '#4dc3ff', '#b64dff', '#ff4d4d'].forEach((c, i, all) =>
-        grad.addColorStop(i / (all.length - 1), c),
-      );
-      return grad;
-    }
-    return t.color;
-  }
-
-  function drawItem(visuals, tier, x, y, angle, time) {
-    const { radius: r, rainbow, color } = getTier(tier);
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle);
-
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.save();
-    ctx.clip();
-    ctx.drawImage(visuals[tier - 1], -r, -r, r * 2, r * 2);
-    ctx.restore();
-
-    if (rainbow) {
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 18 + 6 * Math.sin(time / 200);
-    }
-    ctx.lineWidth = Math.max(2.5, r * 0.09);
-    ctx.strokeStyle = borderStyle(tier, angle, time);
-    ctx.stroke();
-    ctx.restore();
+  // Items are drawn upright (ignoring the body's spin) so faces stay
+  // readable, like stickers bouncing around.
+  function drawItem(visuals, tier, x, y) {
+    const size = getTier(tier).radius * 2 * DRAW_SCALE;
+    ctx.drawImage(visuals[tier - 1], x - size / 2, y - size / 2, size, size);
   }
 
   function drawEffects(effects, time) {
@@ -118,28 +133,48 @@ export function createRenderer(canvas) {
     }
   }
 
-  function drawFunnel(body) {
+  // The flask outline: up the left of the tube, round the bulb the long
+  // way, back up the right. Stroked just outside the physics walls' inner
+  // edge with a slowly rotating rainbow and a neon glow.
+  function drawFlask(time) {
+    const { centerX: cx, neckWidth: N, neckBottomY, bulbCenterY: cy, bulbRadius: R } = WORLD;
+    const line = 4;
+    const half = N / 2 + line / 2;
+    const { left, right } = neckAngles();
+
+    ctx.save();
     ctx.beginPath();
-    body.vertices.forEach((v, i) => (i === 0 ? ctx.moveTo(v.x, v.y) : ctx.lineTo(v.x, v.y)));
-    ctx.closePath();
-    ctx.fillStyle = '#4a4266';
-    ctx.fill();
+    ctx.moveTo(cx - half, 0);
+    ctx.lineTo(cx - half, neckBottomY);
+    ctx.arc(cx, cy, R + line / 2, left, right, true);
+    ctx.lineTo(cx + half, 0);
+
+    let stroke = '#ffffff';
+    if (ctx.createConicGradient) {
+      stroke = ctx.createConicGradient(time / 4000, cx, cy);
+      RAINBOW.forEach((c, i) => stroke.addColorStop(i / (RAINBOW.length - 1), c));
+    }
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = line;
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+    ctx.restore();
   }
 
   // state: { bodies, visuals, effects, time }
   function draw(state) {
     const { time } = state;
 
-    ctx.fillStyle = '#1e1a2b';
+    ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, WORLD.width, WORLD.height);
 
     for (const body of state.bodies) {
-      if (body.label === 'funnel') drawFunnel(body);
-      else if (body.label === 'item') {
-        drawItem(state.visuals, body.tier, body.position.x, body.position.y, body.angle, time);
-      }
+      if (body.label === 'item') drawItem(state.visuals, body.tier, body.position.x, body.position.y);
     }
 
+    drawFlask(time);
     drawEffects(state.effects, time);
   }
 

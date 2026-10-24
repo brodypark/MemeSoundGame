@@ -5,14 +5,18 @@ import { setupMerging } from './merge.js';
 import { createRenderer } from './render.js';
 import { playBuffer } from '../audio/playback.js';
 
-const { Engine, Composite } = Matter;
+const { Engine, Body, Composite } = Matter;
 
 const STEP_MS = 1000 / 60; // fixed physics step, independent of display Hz
-const SPAWN_INTERVAL_MS = 1200; // a new tier 1 drops in this often
-const MAX_ITEMS = 80; // pause spawning if the box gets this full
+const SPAWN_INTERVAL_MS = 533; // a new tier 1 drops in this often
+const MAX_ITEMS = 30; // pause spawning if the flask gets this full
+// Downward speed for new items (units per step). Gravity is so low that a
+// spawn starting at rest has barely moved by the next spawn and the two
+// merge right at the top of the tube.
+const SPAWN_SPEED = 3.5;
 
 // Runs the simulation: tier 1s rain in from the top on their own, fall
-// through the funnel, and merge in the box. No input, no game over.
+// through the tube, and merge in the bulb. No input, no game over.
 // `sound` is an AudioBuffer (or null to play silently); `visuals` is one
 // drawable per tier.
 export function createGame({ canvas, sound, visuals, onScore }) {
@@ -47,14 +51,18 @@ export function createGame({ canvas, sound, visuals, onScore }) {
     },
   });
 
-  // Spawn just above the visible area at a random x, so items slide into
-  // view rather than popping into existence.
+  // Spawn just above the visible area inside the tube, so items slide into
+  // view rather than popping into existence. A little x jitter keeps them
+  // from stacking perfectly and makes them bounce off the tube walls.
   function spawn() {
     const items = Composite.allBodies(engine.world).filter((b) => b.label === 'item');
     if (items.length >= MAX_ITEMS) return;
     const r = getTier(1).radius;
-    const x = r + Math.random() * (WORLD.width - r * 2);
-    Composite.add(engine.world, createItem(1, x, -r));
+    const jitter = Math.max(0, WORLD.neckWidth / 2 - r - 1);
+    const x = WORLD.centerX + (Math.random() * 2 - 1) * jitter;
+    const item = createItem(1, x, -r);
+    Body.setVelocity(item, { x: 0, y: SPAWN_SPEED });
+    Composite.add(engine.world, item);
   }
 
   // --- Loop: fixed-step physics with an accumulator, render every frame.

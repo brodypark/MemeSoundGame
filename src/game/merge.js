@@ -1,5 +1,5 @@
 import Matter from 'matter-js';
-import { TIER_COUNT } from './tiers.js';
+import { TIER_COUNT, getTier } from './tiers.js';
 import { WORLD, createItem } from './world.js';
 
 const { Events, Composite, Body } = Matter;
@@ -13,7 +13,13 @@ const { Events, Composite, Body } = Matter;
 //   merges are queued during collision events and applied in `afterUpdate`.
 // - A freshly merged body may already overlap another body of its new tier.
 //   That shows up as a new pair, so it chains on the next step.
+// - Merges in the tube only happen when the result fits through it.
 // - Tier 6 + tier 6 can't go higher, so both pop instead.
+// Leaves some slack so a merged item doesn't wedge between the tube walls.
+function fitsTube(tier) {
+  return tier <= TIER_COUNT && getTier(tier).radius * 2 <= WORLD.neckWidth - 12;
+}
+
 export function setupMerging(engine, { onMerge, onPop }) {
   let queue = [];
 
@@ -21,9 +27,11 @@ export function setupMerging(engine, { onMerge, onPop }) {
     for (const { bodyA: a, bodyB: b } of event.pairs) {
       if (a.label !== 'item' || b.label !== 'item') continue;
       if (a.tier !== b.tier || a.merging || b.merging) continue;
-      // Only merge inside the box. A big merged item in the funnel would
-      // jam the neck.
-      if (a.position.y < WORLD.funnelBottomY || b.position.y < WORLD.funnelBottomY) continue;
+      // In the tube, only merge if the result still fits through it, or a
+      // big merged item would jam it. Small merges up there keep the tube
+      // from backing up when the bulb is busy.
+      const inTube = a.position.y < WORLD.neckBottomY || b.position.y < WORLD.neckBottomY;
+      if (inTube && !fitsTube(a.tier + 1)) continue;
       a.merging = true;
       b.merging = true;
       queue.push([a, b]);

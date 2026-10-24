@@ -320,7 +320,7 @@ fileInput.addEventListener('change', () => {
 
 // --- Default
 $('#default-btn').addEventListener('click', () =>
-  pickSound('Default meow', () => loadSound('/default-sound.wav'), 'cat'),
+  pickSound('Default meow', () => loadSound('/default-sound.mp3'), 'cat'),
 );
 
 // --- Preview

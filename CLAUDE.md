@@ -33,7 +33,7 @@ sound-merge/
 ├── api/
 │   └── generate-image.js # API handler, holds the API key + prompt ladder
 ├── public/
-│   ├── default-sound.wav # fallback sound so the game works with no input
+│   ├── default-sound.mp3 # fallback sound (male-voice meow) so the game works with no input
 │   └── yamnet_class_map.csv
 └── src/
     ├── main.js           # app entry, screen flow
@@ -46,10 +46,10 @@ sound-merge/
     │   └── generate.js   # requests all 6 tier images, progress, caching
     ├── game/
     │   ├── game.js       # sim loop: spawning, physics steps, scoring, effects
-    │   ├── world.js      # Matter.js setup, funnel + box walls
+    │   ├── world.js      # Matter.js setup, flask walls (tube + round bulb)
     │   ├── merge.js      # collision handling + tier logic
     │   ├── tiers.js      # 6 tiers: sizes, pitch rates, border colors
-    │   └── render.js     # canvas drawing, images clipped to circles
+    │   └── render.js     # canvas drawing: rainbow flask outline, glowing cutout images
     └── styles.css
 ```
 
@@ -109,10 +109,10 @@ sound-merge/
 ## Game design
 
 - **6 tiers.** Tier N + Tier N → Tier N+1. Tier 6 does not merge further (pops with a big flourish; maybe bonus points).
-- Tier sizes grow roughly 1.35–1.5× per tier. Define everything in `tiers.js` so it's easy to tune.
-- Pitch per tier: `playbackRate = 2 ** (-semitones / 12)`, dropping ~4 semitones per tier (tier 1 = original, tier 6 ≈ 20 semitones lower). Tune by ear so tier 6 is a deep rumble.
+- Tier 1 is big (radius 45) and sizes grow ~1.13× per tier, so the bulb doesn't clog and two tier 6s still fit side by side. Keep one-of-each-tier under about a third of the bulb's area or the tube jams. Define everything in `tiers.js` so it's easy to tune.
+- Pitch per tier: `playbackRate = 2 ** (-semitones / 12)`, dropping 4 semitones per tier (tier 1 = 4 semitones above the original, tier 2 = original, i.e. the first merge you hear, tier 6 = 16 semitones lower). Tune by ear so tier 6 is a deep rumble.
 - Each tier has a colored border (e.g. baby pink → gold → glowing rainbow for tier 6) so progress reads at a glance.
-- It's a simulation, not a game: no aiming, no game over. Tier 1s auto-spawn at random x along the top (~1.2s interval, paused above an item cap), slide through a funnel, and merge only once below the funnel neck (so big merged items can't jam it). A Reset button clears the box.
+- It's a simulation, not a game: no aiming, no game over. Tier 1s auto-spawn at random x along the top (~0.53s interval, falling at a set starting speed so they don't merge as they spawn, paused above an item cap), fall single file down the narrow tube of a flask into its round bulb, and merge in the bulb, or in the tube only when the merged item still fits through it (so nothing jams the tube). A Reset button clears the box.
 - Physics feel: low gravity (0.1) and springy items/walls (high restitution, very low air drag). Tune in `world.js` / `game.js`.
 - Only play sounds on a merge (not on spawn). Throttle if many merges happen at once.
 - Mobile-friendly: canvas scales to viewport.
@@ -176,7 +176,7 @@ MAX_IMAGES_PER_DAY=300
 
 **Phase 1: The game with fake input**
 - Matter.js funnel + box, auto-spawning items, merge logic, **6 tiers**, canvas rendering.
-- Use 6 placeholder visuals (e.g. a row of emoji or colored circles of increasing size) and `public/default-sound.wav`.
+- Use 6 placeholder visuals (e.g. a row of emoji or colored circles of increasing size) and `public/default-sound.mp3`.
 - Pitch-shifted merge sounds working across all 6 tiers.
 
 **Phase 2: Sound input**
