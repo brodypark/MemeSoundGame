@@ -115,6 +115,10 @@ function containItems(engine) {
     }
     const dx = body.position.x - cx;
     const dy = body.position.y - cy;
+    // Just below the tube, an item coming down is still in the bulb's
+    // opening, not in a wall, even though it's outside the circle. Without
+    // this it got snapped ~36 units down mid-fall (a visible stutter).
+    if (dy < 0 && 2 * r < N && Math.abs(dx) <= N / 2 - r * 0.5) continue;
     const d = Math.hypot(dx, dy);
     if (d <= R - r * 0.5) continue;
     const nx = dx / d;
