@@ -6,7 +6,7 @@
 // image-generation proxy. Responds with the image bytes (Gemini returns PNG
 // or JPEG), or JSON { error } with a player-facing message.
 //
-// Works both as a Vercel Node function and as Vite dev middleware
+// Runs inside server.js in production and as Vite dev middleware locally
 // (see vite.config.js), so it only uses plain Node req/res APIs.
 
 import { normalizeSubject, validateSubject } from '../src/audio/subject.js';
@@ -112,7 +112,7 @@ function sendJson(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
-// Vercel pre-parses JSON into req.body; the Vite dev middleware doesn't.
+// Some hosts pre-parse JSON into req.body; plain Node servers don't.
 async function readBody(req) {
   if (req.body && typeof req.body === 'object') return req.body;
   let raw = '';

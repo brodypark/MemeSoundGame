@@ -13,8 +13,8 @@ The joke: lower pitch = more sigma. A tiny baby cat's high-pitched meow becomes 
 - **Audio:** Web Audio API (`AudioBufferSourceNode.playbackRate` for pitch), `getUserMedia` + `MediaRecorder` for the mic
 - **Classification:** YAMNet via TensorFlow.js, runs fully in the browser
 - **Image generation:** called only from a serverless function, never from the browser
-- **Backend:** one Vercel serverless function (`/api/generate-image`)
-- **Hosting:** Vercel, deployed from GitHub
+- **Backend:** one API route (`/api/generate-image`), served by `server.js` (plain `node:http`, also serves `dist/`)
+- **Hosting:** Render web service (`render.yaml`), auto-deployed from GitHub
 
 ## Project structure
 
@@ -28,8 +28,10 @@ sound-merge/
 ├── package.json
 ├── vite.config.js
 ├── index.html
+├── render.yaml           # Render blueprint (no secrets)
+├── server.js             # production server: static dist/ + /api/generate-image
 ├── api/
-│   └── generate-image.js # serverless function, holds the API key + prompt ladder
+│   └── generate-image.js # API handler, holds the API key + prompt ladder
 ├── public/
 │   ├── default-sound.wav # fallback sound so the game works with no input
 │   └── yamnet_class_map.csv
@@ -119,14 +121,14 @@ sound-merge/
 
 ## SECRETS AND SECURITY (read this before touching git)
 
-- **The API key lives only in `.env.local` locally and in Vercel environment variables in production.** It is only ever read inside `api/generate-image.js`.
+- **The API key lives only in `.env.local` locally and in Render environment variables in production.** It is only ever read inside `api/generate-image.js`.
 - **Never** put the key in frontend code, `index.html`, `vite.config.js`, anything prefixed `VITE_`, or anything bundled to the browser. `VITE_*` variables are public.
 - **Never** commit `.env`, `.env.local`, or any file with a real key. Commit `.env.example` with placeholder values only.
 - **Never** print, log, or echo the key in terminal output, code comments, or error messages.
 - Before every commit: run `git status` and `git diff --staged` and confirm no secrets or `.env*` files (other than `.env.example`) are staged. Do **not** use `git add .` blindly; stage files deliberately.
 - If a key is ever committed or pasted somewhere public: **revoke and rotate it immediately** at the provider dashboard. Removing it in a later commit does not remove it from git history.
 - Set a **hard monthly spend limit** in the image provider's dashboard. With 6 images per new sound, this matters more.
-- The serverless function should: validate input (`subject` must be a 2–50 char string matching the same allowlist as `src/audio/subject.js`; `tier` must be an integer 1–6), reject everything else, build the prompt server-side, fix model/size/quality server-side (never trust client-supplied params), and apply rate limiting per IP plus a global daily cap.
+- The API handler should: validate input (`subject` must be a 2–50 char string matching the same allowlist as `src/audio/subject.js`; `tier` must be an integer 1–6), reject everything else, build the prompt server-side, fix model/size/quality server-side (never trust client-supplied params), and apply rate limiting per IP plus a global daily cap.
 - The deployed API route must not be a free open proxy: it only accepts `{ subject, tier }` and always uses server-side-fixed settings.
 
 ### `.gitignore` (create first, before the first commit)
@@ -165,7 +167,7 @@ MAX_IMAGES_PER_DAY=300
 - Work in small commits with clear messages (`Add YAMNet classification`, `Implement 6-tier merging`). Use short-lived branches for bigger features (`feature/mic-recording`) and merge to `main` when it works.
 - Never force-push to `main`.
 - Enable GitHub **secret scanning / push protection** in the repo's Security settings.
-- Deploy: connect the GitHub repo to Vercel, add the env vars in the Vercel project settings (not in the repo), and let pushes to `main` auto-deploy.
+- Deploy: create a Render Blueprint from the GitHub repo (`render.yaml`), enter `IMAGE_API_KEY` in the Render dashboard (not in the repo), and let pushes to `main` auto-deploy.
 
 ## Build plan (do in order; each phase should end with something playable/testable)
 
@@ -190,14 +192,14 @@ MAX_IMAGES_PER_DAY=300
 - `api/generate-image.js`: validate `{ subject, tier }`, build the server-side prompt from the baby→mogger ladder, fixed server-side params, rate limiting + daily cap.
 - Frontend: request all 6 tiers, per-tier progress UI, retry once, per-tier fallback visual, cache all 6 by subject.
 - Wire the 6 images into the 6 tiers in the game.
-- Local dev: `npm run dev` runs `api/generate-image.js` as Vite dev middleware (see `vite.config.js`), reading `.env.local` server-side only. `vercel dev` also works once the project is linked.
+- Local dev: `npm run dev` runs `api/generate-image.js` as Vite dev middleware (see `vite.config.js`), reading `.env.local` server-side only. `npm run build && npm start` runs the production server locally.
 - Test with a few subjects (cat, dog, water) and check the glow-up reads clearly and the character stays consistent. If not, switch to the reference-image approach.
 
 **Phase 5: Polish**
 - Reveal animation showing the 6-image evolution before the game starts, merge effects (pop, particles), tier-6 flourish, score, game over + restart, evolution chart sidebar, mobile layout, "try another sound" button.
 
 **Phase 6: Deploy**
-- Vercel + env vars, test on a phone (mic permissions require HTTPS), set the provider spend limit, confirm secret scanning is on.
+- Render + env vars, test on a phone (mic permissions require HTTPS), set the provider spend limit, confirm secret scanning is on.
 
 ## Code style and working rules
 
@@ -205,5 +207,5 @@ MAX_IMAGES_PER_DAY=300
 - Keep modules small and single-purpose; no dependencies beyond Matter.js, TensorFlow.js, and Vite unless justified.
 - Prefer plain, readable code over clever code; comment the non-obvious parts (resampling, pitch math, merge edge cases, prompt ladder).
 - Handle errors visibly in the UI (mic denied, unsupported file, classification failed, generation failed), never silent failures.
-- Before saying a phase is done, run it (`npm run dev` / `vercel dev`) and confirm it actually works.
+- Before saying a phase is done, run it (`npm run dev`, or `npm run build && npm start` for the production server) and confirm it actually works.
 - Ask before adding a new dependency, changing the stack, or doing anything that touches billing or secrets.

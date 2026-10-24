@@ -1,0 +1,25 @@
+# Render Blueprint: one Node web service that serves dist/ and the image API.
+# Secrets are NOT set here. IMAGE_API_KEY is marked sync: false, so Render asks
+# for it in the dashboard and it never lives in the repo.
+services:
+  - type: web
+    name: sound-merge
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: IMAGE_API_KEY
+        sync: false
+      - key: IMAGE_PROVIDER
+        value: gemini
+      - key: IMAGE_MODEL
+        value: gemini-3.1-flash-lite-image
+      - key: IMAGE_SIZE
+        value: 1K
+      - key: MAX_SETS_PER_IP_PER_HOUR
+        value: "3"
+      - key: MAX_IMAGES_PER_DAY
+        value: "300"

@@ -9,12 +9,21 @@ npm install
 npm run dev
 ```
 
-Once the image API exists (Phase 4), use `vercel dev` instead so `/api/generate-image` runs locally.
+`npm run dev` also runs `/api/generate-image` locally. To run the production server instead:
+
+```bash
+npm run build
+npm start   # http://localhost:3000
+```
+
+## Deploy
+
+Hosted on Render as one Node web service (`render.yaml`): it builds with Vite, then `server.js` serves `dist/` and the image API. Set `IMAGE_API_KEY` in the Render dashboard; pushes to `main` auto-deploy.
 
 ## Environment variables
 
-Copy `.env.example` to `.env.local` and fill in real values. `.env.local` is gitignored and must never be committed. The API key is read only by the serverless function, never by frontend code.
+Copy `.env.example` to `.env.local` and fill in real values. `.env.local` is gitignored and must never be committed. The API key is read only by `api/generate-image.js` on the server, never by frontend code.
 
 ## Stack
 
-Vanilla JS + Vite, Matter.js, Web Audio API, YAMNet via TensorFlow.js, one Vercel serverless function for image generation.
+Vanilla JS + Vite, Matter.js, Web Audio API, YAMNet via TensorFlow.js, a tiny Node server (`server.js`) on Render for image generation.

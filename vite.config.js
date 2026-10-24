@@ -1,8 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 
 // Runs api/generate-image.js inside the Vite dev server, so `npm run dev`
-// works without the Vercel CLI. In production Vercel runs the same file as a
-// serverless function.
+// has the image API too. In production server.js runs the same file.
 //
 // Secrets: loadEnv reads .env.local into the *server* process only. Nothing
 // here goes into `define`, and none of the keys are VITE_-prefixed, so the
