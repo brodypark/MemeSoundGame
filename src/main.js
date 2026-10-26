@@ -5,9 +5,12 @@
 // pre-fills the "what made this sound?" box, which the player can edit.
 // Then the 6 tier images for that subject are generated (or loaded from
 // cache) and shown as an evolution ladder before the simulation starts.
+// Mike mode is a special case: a fixed voice clip and photo, straight to
+// the simulation with nothing generated.
 import { createGame } from './game/game.js';
 import { createPlaceholderVisuals, createTierVisual } from './game/render.js';
 import { getTierImages } from './image/generate.js';
+import { loadMike, MIKE_SUBJECT } from './image/mike.js';
 import { TIER_COUNT } from './game/tiers.js';
 import { loadSound, unlockAudio, playBuffer } from './audio/playback.js';
 import { startRecording } from './audio/record.js';
@@ -36,12 +39,14 @@ app.innerHTML = `
         <section id="pick">
           <p>A sound rains into the flask, merges, glows up, and gets deeper.</p>
           <button id="default-btn" class="primary big" type="button">🐱 Use the default meow</button>
+          <button id="mike-btn" class="special" type="button">💪 Mike mode</button>
           <p class="or">or use your own sound (2s max)</p>
           <div class="actions small">
             <button id="record-btn" type="button">🎙️ Record</button>
             <button id="upload-btn" type="button">📁 Upload</button>
           </div>
           <input id="file-input" type="file" accept="audio/*,video/*" hidden />
+          <p class="tip">🔊 Turn your sound up. The deep merges are the best part.</p>
         </section>
 
         <section id="recording" hidden>
@@ -300,6 +305,16 @@ async function startDefault() {
   titleEl.title = failed ? `${[...new Set(errors)].join(' ')} Using stand-ins for the missing ones.` : '';
 }
 
+// Mike mode: `visuals` is already his photo crops (set while loading), so
+// there's nothing to wait for.
+function startMike() {
+  previewReady = false;
+  subject = MIKE_SUBJECT;
+  titleEl.textContent = `Brainrot with Brody · ${subject}`;
+  titleEl.title = '';
+  startGame();
+}
+
 function startGame() {
   game?.destroy();
   overlay.hidden = true;
@@ -354,6 +369,15 @@ fileInput.addEventListener('change', () => {
 // --- Default: straight to the simulation
 $('#default-btn').addEventListener('click', () =>
   pickSound(() => loadSound('/default-sound.mp3'), startDefault),
+);
+
+// --- Mike mode: his voice and photo, straight to the simulation
+$('#mike-btn').addEventListener('click', () =>
+  pickSound(async () => {
+    const mike = await loadMike();
+    visuals = mike.visuals;
+    return mike.sound;
+  }, startMike),
 );
 
 // --- Preview

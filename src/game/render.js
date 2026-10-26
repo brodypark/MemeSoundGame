@@ -81,6 +81,61 @@ function imageVisual(image, { tier }) {
   return glowVisual(c, tier);
 }
 
+const FIGURE_RING = 8; // tier-colored border around figure discs
+const FIGURE_HEIGHT = 0.88; // the figure's height as a fraction of the disc
+const DISC_BG = '#120f1a';
+
+// A tall full-body cutout (Mike mode: a real photo with its background
+// already removed) standing in a disc. Physics items are circles, so a
+// bare tall figure would seem to bounce off thin air; the disc shows the
+// item's real size. The disc is tinted and ringed in the tier's color so
+// tiers read at a glance, and the figure is scaled to fit inside it head
+// to toe (a narrow figure fits well clear of the disc's curved edge).
+function figureVisual(image, { tier, color }) {
+  const half = VISUAL_SIZE / 2;
+  const c = document.createElement('canvas');
+  c.width = c.height = VISUAL_SIZE;
+  const g = c.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+
+  const disc = () => {
+    g.beginPath();
+    g.arc(half, half, half, 0, Math.PI * 2);
+  };
+  g.fillStyle = DISC_BG;
+  disc();
+  g.fill();
+  const tint = g.createRadialGradient(half, half, 0, half, half, half);
+  tint.addColorStop(0, color);
+  tint.addColorStop(1, DISC_BG);
+  g.globalAlpha = 0.45;
+  g.fillStyle = tint;
+  disc();
+  g.fill();
+  g.globalAlpha = 1;
+
+  // A faint light rim around the silhouette so he stands out from the tint.
+  const h = VISUAL_SIZE * FIGURE_HEIGHT;
+  const w = (h * image.width) / image.height;
+  g.save();
+  g.shadowColor = 'rgba(255, 255, 255, 0.45)';
+  g.shadowBlur = 8;
+  g.drawImage(image, half - w / 2, half - h / 2, w, h);
+  g.restore();
+
+  g.strokeStyle = color;
+  g.lineWidth = FIGURE_RING;
+  g.beginPath();
+  g.arc(half, half, half - FIGURE_RING / 2, 0, Math.PI * 2);
+  g.stroke();
+  return glowVisual(c, tier);
+}
+
+// The visual for one tier from a full-body cutout (see figureVisual).
+export function createFigureVisual(tier, image) {
+  return figureVisual(image, getTier(tier));
+}
+
 export function createPlaceholderVisuals() {
   return TIERS.map(placeholderVisual);
 }

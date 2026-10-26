@@ -4,6 +4,23 @@
   --muted: #a49fbd;
   --accent: #ffd700;
   --danger: #ff6b6b;
+  --panel-bg: #241f33;
+  --inset-bg: #1a1626;
+  --line: rgba(255, 255, 255, 0.1);
+
+  /* Spacing scale (4px base). Use these instead of raw pixel gaps so the
+     HUD and every overlay screen share the same rhythm. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+
   font-family: system-ui, -apple-system, sans-serif;
 }
 
@@ -26,35 +43,47 @@ body {
   height: 100dvh;
 }
 
+/* ---------- HUD header ---------- */
+
 .hud {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 10px 16px;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-4);
 }
 
+/* The title takes the leftover width and truncates instead of pushing the
+   score/buttons off screen (long subjects can end up in here). */
 .hud .title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 700;
 }
 
 .hud-right {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-2);
 }
 
-.hud button {
-  padding: 6px 14px;
-  border: 1px solid var(--muted);
+/* Score as a compact pill, same height as the HUD buttons. */
+.hud .score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: 5px var(--space-3);
+  border: 1px solid rgba(255, 215, 0, 0.35);
   border-radius: 999px;
-  background: transparent;
-  color: var(--fg);
-  font: inherit;
-  cursor: pointer;
-}
-
-.hud button[hidden] {
-  display: none;
+  background: rgba(255, 215, 0, 0.08);
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .hud strong {
@@ -62,6 +91,27 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.hud button {
+  padding: 5px var(--space-3);
+  border: 1px solid var(--muted);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.hud button[hidden] {
+  display: none;
+}
+
+/* ---------- Stage + canvas ---------- */
+
+/* render.js sizes #game to this element's content box, so its padding is
+   part of the canvas layout; change it with care. */
 .stage {
   position: relative;
   flex: 1;
@@ -80,13 +130,18 @@ body {
   -webkit-user-select: none;
 }
 
+/* ---------- Overlay + panel ---------- */
+
 .overlay {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 16px;
+  padding: var(--space-4);
   background: rgba(10, 8, 16, 0.6);
+  /* Soften the flask behind the panel so the text stays readable. */
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
 
 .overlay[hidden] {
@@ -95,11 +150,27 @@ body {
 
 .panel {
   width: 100%;
-  max-width: 340px;
-  padding: 24px;
-  border-radius: 16px;
-  background: #241f33;
+  max-width: 380px;
+  /* Short screens: scroll inside the panel rather than clipping it. */
+  max-height: 100%;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   text-align: center;
+}
+
+/* Every screen is a vertical stack; `gap` gives the base rhythm, and the
+   few elements that need more breathing room add a margin on top.
+   Hidden children are display:none, so they don't leave empty gaps. */
+.panel section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .panel section[hidden] {
@@ -107,17 +178,18 @@ body {
 }
 
 .panel h1 {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-4);
   font-size: 2rem;
 }
 
 .panel p {
-  margin: 0 0 16px;
+  margin: 0;
   color: var(--muted);
+  line-height: 1.45;
 }
 
 .panel .error {
-  margin: 16px 0 0;
+  margin: var(--space-4) 0 0;
   color: var(--danger);
 }
 
@@ -128,12 +200,16 @@ body {
 .actions {
   display: flex;
   justify-content: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: var(--space-3);
+}
+
+/* Paired buttons share the row equally so they line up as a set. */
+.actions button {
+  flex: 1;
 }
 
 .panel button {
-  padding: 12px 20px;
+  padding: var(--space-3) var(--space-5);
   border: 1px solid var(--muted);
   border-radius: 999px;
   background: transparent;
@@ -159,26 +235,60 @@ body {
   color: transparent;
 }
 
+/* Intro copy sits a bit further from the primary button than the base gap. */
+#pick > p:first-child {
+  margin-bottom: var(--space-2);
+}
+
 /* The main call to action: start right away with the default sound. */
 .panel button.big {
   width: 100%;
-  padding: 16px 20px;
+  padding: var(--space-4) var(--space-5);
   font-size: 1.15rem;
 }
 
+/* Mike mode: full width under the main button, gold outline so it reads
+   as a special pick rather than another way to bring your own sound. */
+.panel button.special {
+  width: 100%;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* "or" divider: the text sits between two hairlines drawn by the pseudo
+   elements, which flex to fill the rest of the row. */
 .panel .or {
-  margin: 18px 0 8px;
-  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  font-size: 0.85rem;
+}
+
+.panel .or::before,
+.panel .or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.panel .tip {
+  margin-top: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
 }
 
 .actions.small button {
-  padding: 8px 14px;
+  padding: var(--space-2) var(--space-4);
   font-size: 0.9rem;
   font-weight: 400;
 }
 
 .panel button.link {
-  padding: 4px;
+  align-self: center;
+  padding: var(--space-1) var(--space-2);
   border: 0;
   color: var(--muted);
   font-weight: 400;
@@ -194,9 +304,10 @@ body {
   font-weight: 700;
 }
 
+/* ---------- Recording ---------- */
+
 .progress {
   height: 8px;
-  margin-bottom: 16px;
   border-radius: 999px;
   background: #3a3350;
   overflow: hidden;
@@ -208,18 +319,31 @@ body {
   background: var(--danger);
 }
 
+#stop-btn {
+  align-self: center;
+  min-width: 140px;
+  margin-top: var(--space-1);
+}
+
+/* ---------- Preview ---------- */
+
 .waveform {
   display: block;
   width: 100%;
   height: 64px;
-  margin-bottom: 8px;
-  border-radius: 8px;
-  background: #1a1626;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--inset-bg);
 }
 
 .panel .meta {
   font-size: 0.9rem;
   overflow-wrap: anywhere;
+}
+
+/* Meta line hugs the waveform it describes. */
+.waveform + .meta {
+  margin-top: calc(-1 * var(--space-1));
 }
 
 .panel .heard {
@@ -239,23 +363,23 @@ body {
 }
 
 .subject {
-  margin: 0 0 16px;
+  margin: 0;
   text-align: left;
 }
 
 .subject label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: var(--space-2);
   font-size: 0.9rem;
   font-weight: 700;
 }
 
 .subject input {
   width: 100%;
-  padding: 10px 12px;
+  padding: 10px var(--space-3);
   border: 1px solid var(--muted);
   border-radius: 10px;
-  background: #1a1626;
+  background: var(--inset-bg);
   color: var(--fg);
   /* 16px stops iOS Safari from zooming in when the field is focused. */
   font: inherit;
@@ -272,7 +396,7 @@ body {
 }
 
 .panel .field-error {
-  margin: 6px 0 0;
+  margin: var(--space-2) 0 0;
   color: var(--danger);
   font-size: 0.9rem;
 }
@@ -281,21 +405,27 @@ body {
   display: none;
 }
 
-.hud .title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
+/* Start/Play get a little separation from the form above. */
+#preview .actions {
+  margin-top: var(--space-1);
 }
+
+/* ---------- Generating ladder ---------- */
 
 .ladder {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 6px;
-  margin-bottom: 12px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-2);
+  align-items: center;
+  justify-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--inset-bg);
 }
 
 .ladder .slot {
+  display: block;
   width: 100%;
   aspect-ratio: 1;
   transition: opacity 0.3s, transform 0.3s;
@@ -310,6 +440,11 @@ body {
 .ladder .slot.failed {
   opacity: 0.6;
   filter: grayscale(0.6);
+}
+
+#go-btn {
+  width: 100%;
+  margin-top: var(--space-1);
 }
 
 @keyframes pulse {
